@@ -34,6 +34,8 @@ getLabel (label, _, _) = label
 getSource :: MyEdge -> Label
 getSource (src, _, _) = src
 
+getDest :: MyEdge -> Label
+getDest (_, dest, _) = dest
 
 getWeight :: MyEdge -> Int
 getWeight (_, _, weight) = weight
@@ -58,19 +60,20 @@ removeThisNode (x:xs) node
 getNeighborsOfNode :: [MyEdge] -> Label -> [MyNode]
 getNeighborsOfNode [] _ = []
 getNeighborsOfNode (x:xs) label
-    | getSource x == label = (label, getWeight x, []) : getNeighborsOfNode xs label
+    | getSource x == label = (getDest x, getWeight x, []) : getNeighborsOfNode xs label
     | otherwise = getNeighborsOfNode xs label
 
-updateNodeListNext :: [MyNode] -> MyNode -> [MyNode]
-updateNodeListNext (x:[]) _ = [x]
+updateNodeListNext :: [MyNode] -> MyNode -> MyNode
+updateNodeListNext [] node = node
+-- updateNodeListNext (x:[]) _ = x
 updateNodeListNext ((label, distance, path):xs) node
-    | label == getLabel node = [node]
+    | label == getLabel node = (label, distance, path)
     | otherwise = updateNodeListNext xs node
 
---                 new_ones     old        updated
+--                 old     new_ones        updated
 updateNodeList :: [MyNode] -> [MyNode] -> [MyNode]
 updateNodeList [] _ = []
-updateNodeList (node:xs) nodes = updateNodeListNext nodes node ++ updateNodeList xs nodes
+updateNodeList (node:xs) nodes = updateNodeListNext nodes node : updateNodeList xs nodes
 
 
 initAllNodesStartToZero :: [MyNode] -> String -> [MyNode] -- put distance to infinity
@@ -80,27 +83,38 @@ initAllNodesStartToZero ((label, distance, path):xs) start
     | otherwise = (label, 99, path) : initAllNodesStartToZero xs start
 
 -- TODO see for the path
+-- iterateThroughNeighbors :: MyGraph -> [MyNode] -> MyNode -> [MyNode]
+-- iterateThroughNeighbors _ [] _ = []
+-- iterateThroughNeighbors (nodes, edges) (n:neighbors) current_node
+--     | getDistance current_node + getDistance n < getDistance (lookForNode nodes (getLabel n)) =
+--         (getLabel n, getDistance current_node + getDistance n, []) : iterateThroughNeighbors (nodes, edges) neighbors current_node
+--     | otherwise = iterateThroughNeighbors (nodes, edges) neighbors current_node
+
+-- return nodes to update
 iterateThroughNeighbors :: MyGraph -> [MyNode] -> MyNode -> [MyNode]
 iterateThroughNeighbors _ [] _ = []
-iterateThroughNeighbors (nodes, edges) (n:neighbors) current_node
-    | getDistance current_node + getDistance n < getDistance (lookForNode nodes (getLabel n)) =
-        (getLabel n, getDistance current_node + getDistance n, []) : iterateThroughNeighbors (nodes, edges) neighbors current_node
-    | otherwise = n : iterateThroughNeighbors (nodes, edges) neighbors current_node
-
+iterateThroughNeighbors (nodes, edges) (n:neighbors) current_node =
+    let currentDistance = getDistance current_node
+        neighborDistance = getDistance n
+        existingNodeDistance = getDistance (lookForNode nodes (getLabel n))
+        newDistance = currentDistance + neighborDistance
+    in traceShow ("iterateThroughNeighbors Current node: " ++ show current_node ++ ", Neighbor: " ++ show n ++ ", Current Distance: " ++ show currentDistance ++ ", Neighbor Distance: " ++ show neighborDistance ++ ", Existing Node Distance: " ++ show existingNodeDistance ++ ", New Distance: " ++ show newDistance) $
+       if newDistance < existingNodeDistance
+       then (getLabel n, newDistance, []) : iterateThroughNeighbors (nodes, edges) neighbors current_node
+       else iterateThroughNeighbors (nodes, edges) neighbors current_node
 
 
 iterateThroughUnvisited :: MyGraph -> [MyNode] -> MyGraph
 iterateThroughUnvisited (nodes, edges) [] = (nodes, edges)
-iterateThroughUnvisited (nodes, edges) unvisited
-    | length unvisited > 10 = traceShow ("Stopping " ++ show unvisited) (nodes, edges)
-    | otherwise =
-        let current_node = traceShow ("Current node: " ++ show (nodeWithSmallestDistance unvisited)) (nodeWithSmallestDistance unvisited)
-            neighbors = traceShow ("Neighbors of " ++ show current_node ++ ": " ++ show (getNeighborsOfNode edges (getLabel current_node))) (getNeighborsOfNode edges (getLabel current_node))
-            updatedValues = traceShow ("Updated values: " ++ show (iterateThroughNeighbors (nodes, edges) neighbors current_node)) (iterateThroughNeighbors (nodes, edges) neighbors current_node)
-            updatedNodes = traceShow ("Updated nodes: " ++ show (updateNodeList nodes updatedValues)) (updateNodeList nodes updatedValues)
-            remainingUnvisited = traceShow ("Remaining unvisited: " ++ show (removeThisNode unvisited current_node)) (removeThisNode unvisited current_node)
-        in iterateThroughUnvisited (updatedNodes, edges) remainingUnvisited
-    
+iterateThroughUnvisited (nodes, edges) unvisited =
+    let current_node = traceShow ("iterateThroughUnvisited Current node: " ++ show (nodeWithSmallestDistance unvisited)) (nodeWithSmallestDistance unvisited)
+        neighbors = traceShow ("Neighbors of " ++ show current_node ++ ": " ++ show (getNeighborsOfNode edges (getLabel current_node))) (getNeighborsOfNode edges (getLabel current_node))
+        updatedValues = (iterateThroughNeighbors (nodes, edges) neighbors current_node)
+        updatedNodes = traceShow ("Updated nodes: ---" ++ show nodes ++ "---" ++ show updatedValues ++ " === " ++ show (updateNodeList nodes updatedValues)) (updateNodeList nodes updatedValues)
+        remainingUnvisited = traceShow ("Remaining unvisited: " ++ show (removeThisNode unvisited current_node)) (removeThisNode unvisited current_node)
+    -- in iterateThroughUnvisited (updatedNodes, edges) remainingUnvisited
+   in current_node `seq` neighbors `seq` updatedValues `seq` updatedNodes `seq` remainingUnvisited `seq` iterateThroughUnvisited (updatedNodes, edges) remainingUnvisited
+
 
 -- INFO: Main function
 argManager :: [String] -> Int -> IO ()
@@ -149,3 +163,7 @@ main :: IO ()
 main = do
     args <- getArgs
     argManager args 0
+
+
+-- Updated Graph: ([("A",0,[]),("B",2,[]),("C",4,[]),("D",99,[]),("E",99,[]),("F",99,[])],
+-- [("A","B",2),("B","A",2),("B","C",1),("C","B",1),("C","E",3),("E","C",3),("E","B",2),("B","E",2),("A","C",4),("C","A",4),("D","B",4),("B","D",4),("D","E",3),("E","D",3),("D","F",2),("F","D",2),("F","E",2),("E","F",2)])
