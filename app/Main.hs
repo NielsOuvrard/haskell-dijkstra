@@ -51,10 +51,10 @@ nodeWithSmallestDistance (n1:n2:ns)
     | getDistance n1 <= getDistance n2 = nodeWithSmallestDistance (n1:ns)
     | otherwise = nodeWithSmallestDistance (n2:ns)
 
-removeThisNode :: [MyNode] -> MyNode -> [MyNode]
+removeThisNode :: [Label] -> MyNode -> [Label]
 removeThisNode [] _ = []
 removeThisNode (x:xs) node
-    | x == node = xs
+    | x == getLabel node = xs
     | otherwise = x : removeThisNode xs node
 
 getNeighborsOfNode :: [MyEdge] -> Label -> [MyNode]
@@ -104,10 +104,10 @@ iterateThroughNeighbors (nodes, edges) (n:neighbors) current_node =
        else iterateThroughNeighbors (nodes, edges) neighbors current_node
 
 
-iterateThroughUnvisited :: MyGraph -> [MyNode] -> MyGraph
+iterateThroughUnvisited :: MyGraph -> [Label] -> MyGraph
 iterateThroughUnvisited (nodes, edges) [] = (nodes, edges)
 iterateThroughUnvisited (nodes, edges) unvisited =
-    let current_node = traceShow ("iterateThroughUnvisited Current node: " ++ show (nodeWithSmallestDistance unvisited)) (nodeWithSmallestDistance unvisited)
+    let current_node = traceShow ("iterateThroughUnvisited Current node: " ++ show (nodeWithSmallestDistance (getAllThesesNodes nodes unvisited))) (nodeWithSmallestDistance (getAllThesesNodes nodes unvisited))
         neighbors = traceShow ("Neighbors of " ++ show current_node ++ ": " ++ show (getNeighborsOfNode edges (getLabel current_node))) (getNeighborsOfNode edges (getLabel current_node))
         updatedValues = (iterateThroughNeighbors (nodes, edges) neighbors current_node)
         updatedNodes = traceShow ("Updated nodes: ---" ++ show nodes ++ "---" ++ show updatedValues ++ " === " ++ show (updateNodeList nodes updatedValues)) (updateNodeList nodes updatedValues)
@@ -115,6 +115,13 @@ iterateThroughUnvisited (nodes, edges) unvisited =
     -- in iterateThroughUnvisited (updatedNodes, edges) remainingUnvisited
    in current_node `seq` neighbors `seq` updatedValues `seq` updatedNodes `seq` remainingUnvisited `seq` iterateThroughUnvisited (updatedNodes, edges) remainingUnvisited
 
+getAllThesesNodes :: [MyNode] -> [Label] -> [MyNode]
+getAllThesesNodes [] _ = []
+getAllThesesNodes nodes labels = filter (\(label, _, _) -> label `elem` labels) nodes
+
+getAllNodesLabels :: [MyNode] -> [Label]
+getAllNodesLabels [] = []
+getAllNodesLabels (x:xs) = getLabel x : getAllNodesLabels xs
 
 -- INFO: Main function
 argManager :: [String] -> Int -> IO ()
@@ -152,10 +159,8 @@ argManager (graphPath : nameStart : nameEnd : _) _ = do
         graph = (nodes, edges)
 
     let initializedNodes = initAllNodesStartToZero nodes nameStart
-    -- trace ("Initialized Nodes: " ++ show initializedNodes) $ return ()
-    let unvisitedNodes = initializedNodes
+    let unvisitedNodes = getAllNodesLabels nodes
 
-    -- trace ("Node with smallest distance: " ++ show (nodeWithSmallestDistance initializedNodes)) (return ())
     let updatedGraph = iterateThroughUnvisited (initializedNodes, edges) unvisitedNodes
     trace ("Updated Graph: " ++ show updatedGraph) $ return ()
 
@@ -164,6 +169,5 @@ main = do
     args <- getArgs
     argManager args 0
 
-
--- Updated Graph: ([("A",0,[]),("B",2,[]),("C",4,[]),("D",99,[]),("E",99,[]),("F",99,[])],
--- [("A","B",2),("B","A",2),("B","C",1),("C","B",1),("C","E",3),("E","C",3),("E","B",2),("B","E",2),("A","C",4),("C","A",4),("D","B",4),("B","D",4),("D","E",3),("E","D",3),("D","F",2),("F","D",2),("F","E",2),("E","F",2)])
+-- A [("A",0,[]),("B",2,[]),("C",3,[]),("D",6,[]),("E",4,[]),("F",6,[])]
+-- B ([("A",2,[]),("B",0,[]),("C",1,[]),("D",4,[]),("E",2,[]),("F",4,[])]
