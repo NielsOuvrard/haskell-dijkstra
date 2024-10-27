@@ -3,8 +3,7 @@ module Main (main) where
 import System.Environment
 import System.Exit
 
-import Debug.Trace (trace)
-import Debug.Trace (traceShow)
+import Lib (readGraphFromFile)
 
 -- * TYPE SYNONYMS
 type Label = String
@@ -14,7 +13,6 @@ type Path = [Label]
 type MyNode = (Label, Distance, Path)
 type MyEdge = (Label, Label, Int)
 type MyGraph = ([MyNode], [MyEdge])
-type MyPath = [MyNode]
 
 -- * FUNCTIONS
 
@@ -49,6 +47,7 @@ lookForNode ((label, dist, path):xs) name
 
 
 nodeWithSmallestDistance :: [MyNode] -> MyNode
+nodeWithSmallestDistance [] = ("", 0, [])
 nodeWithSmallestDistance [node] = node
 nodeWithSmallestDistance (n1:n2:ns)
     | getDistance n1 <= getDistance n2 = nodeWithSmallestDistance (n1:ns)
@@ -80,7 +79,7 @@ updateNodeList (node:xs) nodes = updateNodeListNext nodes node : updateNodeList 
 
 initAllNodesStartToZero :: [MyNode] -> String -> [MyNode]
 initAllNodesStartToZero [] _ = []
-initAllNodesStartToZero ((label, distance, path):xs) start 
+initAllNodesStartToZero ((label, _, path):xs) start 
     | label == start = [(label, 0, path)] ++ initAllNodesStartToZero xs start
     | otherwise = (label, maxBound, path) : initAllNodesStartToZero xs start
 
@@ -109,49 +108,43 @@ getAllNodesLabels :: [MyNode] -> [Label]
 getAllNodesLabels [] = []
 getAllNodesLabels (x:xs) = getLabel x : getAllNodesLabels xs
 
+prettyPrintPath :: [String] -> String
+prettyPrintPath [] = ""
+prettyPrintPath (x:[]) = x
+prettyPrintPath (x:xs) = x ++ " -> " ++ prettyPrintPath xs
+
+prettyPrintData :: String -> String -> [String] -> Int -> String
+prettyPrintData start end path dist =
+    "Shortest path from " ++ start ++ " to " ++ end ++ " is:\n" ++ prettyPrintPath path ++ "\nWith a distance of " ++ show dist
+
 -- INFO: Main function
 argManager :: [String] -> Int -> IO ()
-argManager ("-h" : remainingArgs) n =
-    putStrLn ("Usage: ./haskell-dijkstra [-h] <graph_path> <node_start> <node_end>") >>
-    putStrLn ("\nArguments:") >>
-    putStrLn ("\t-h") >>
-    putStrLn ("\t\tShow this help message and exit") >>
-    putStrLn ("\t<graph_path>") >>
-    putStrLn ("\t\tPath to the graph file") >>
-    putStrLn ("\t<node_start>") >>
-    putStrLn ("\t\tStart node") >>
-    putStrLn ("\t<node_end>") >>
-    putStrLn ("\t\tEnd node") >>
+argManager ("-h" : remainingArgs) n = do
+    putStrLn "Usage: ./haskell-dijkstra [-h] <graph_path> <node_start> <node_end>"
+    putStrLn "\nArguments:"
+    putStrLn "\t-h"
+    putStrLn "\t\tShow this help message and exit"
+    putStrLn "\t<graph_path>"
+    putStrLn "\t\tPath to the graph file"
+    putStrLn "\t<node_start>"
+    putStrLn "\t\tStart node"
+    putStrLn "\t<node_end>"
+    putStrLn "\t\tEnd node"
     argManager remainingArgs (n + 1)
 argManager (graphPath : nameStart : nameEnd : _) _ = do
-
-    let nodes :: [MyNode]
-        nodes = [("A", 0, []), ("B", 0, []), ("C", 0, []), ("D", 0, []), ("E", 0, []), ("F", 0, [])]
-
-    let edges :: [MyEdge]
-        edges = [ ("A", "B", 2), ("B", "A", 2)
-                , ("B", "C", 1), ("C", "B", 1)
-                , ("C", "E", 3), ("E", "C", 3)
-                , ("E", "B", 2), ("B", "E", 2)
-                , ("A", "C", 4), ("C", "A", 4)
-                , ("D", "B", 4), ("B", "D", 4)
-                , ("D", "E", 3), ("E", "D", 3)
-                , ("D", "F", 2), ("F", "D", 2)
-                , ("F", "E", 2), ("E", "F", 2)
-                ]
-    
-    let graph :: MyGraph
-        graph = (nodes, edges)
+    (nodes, edges) <- readGraphFromFile graphPath
 
     let initializedNodes = initAllNodesStartToZero nodes nameStart
     let unvisitedNodes = getAllNodesLabels nodes
 
-    let (updatedNodes, updatedEdges) = iterateThroughUnvisited (initializedNodes, edges) unvisitedNodes
-    let (name, dist, path) = lookForNode updatedNodes nameEnd
-    print ("Shortest path from " ++ nameStart ++ " to " ++ nameEnd ++ " is: " ++ show path ++ " with a distance of " ++ show dist)
+    let (updatedNodes, _) = iterateThroughUnvisited (initializedNodes, edges) unvisitedNodes
+    let (_, dist, path) = lookForNode updatedNodes nameEnd
+    putStrLn $ prettyPrintData nameStart nameEnd (path ++ [nameEnd]) dist
+argManager _ _ = do
+    putStrLn "Invalid arguments. Use -h for help."
 
 main :: IO ()
 main = do
     args <- getArgs
     argManager args 0
-
+    System.Exit.exitSuccess
