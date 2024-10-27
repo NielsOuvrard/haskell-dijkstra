@@ -42,9 +42,6 @@ lookForNode ((label, dist, path):xs) name
     | label == name = (label, dist, path)
     | otherwise = lookForNode xs name
 
--- -- readGraph :: String -> IO Graph
--- -- readGraph str = ()
-
 
 nodeWithSmallestDistance :: [MyNode] -> MyNode
 nodeWithSmallestDistance [] = ("", 0, [])
